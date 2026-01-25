@@ -1,0 +1,72 @@
+{
+    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-01-20T02:45:08+00:00",
+    "name": "OpenFusion",
+    "author": "djjoker13@gmail.com",
+    "description": "OpenFusion (abbreviated as OF) is an unofficial fan-made open-source reverse-engineered server for the Cartoon Network MMORPG FusionFall.",
+    "features": null,
+    "docker_images": {
+        "ghcr.io\/evilgenius13\/pelican-pterodactyl-custom-eggs\/fusionfall:latest": "ghcr.io\/evilgenius13\/pelican-pterodactyl-custom-eggs\/fusionfall:latest"
+    },
+    "file_denylist": [],
+    "startup": ".\/entrypoint.sh",
+    "config": {
+        "files": "{}",
+        "startup": "{\r\n    \"done\": \"Starting shard server at\"\r\n}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": null,
+            "container": "alpine:3.4",
+            "entrypoint": "ash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Announce IP",
+            "description": "The IP sent to the client. Set this to your LAN IP (192.168.x.x). If your host is bound to 0.0.0.0 you probably need this.",
+            "env_variable": "ANNOUNCE_IP",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "string|nullable",
+            "field_type": "text"
+        },
+        {
+            "name": "Login Port",
+            "description": "Login Server Port",
+            "env_variable": "LOGIN_PORT",
+            "default_value": "23000",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|integer",
+            "field_type": "text"
+        },
+        {
+            "name": "Shard Port",
+            "description": "Game Server Port",
+            "env_variable": "SHARD_PORT",
+            "default_value": "23001",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|integer",
+            "field_type": "text"
+        },
+        {
+            "name": "Monitor Port",
+            "description": "Admin\/Monitor Port",
+            "env_variable": "MONITOR_PORT",
+            "default_value": "8003",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|integer",
+            "field_type": "text"
+        }
+    ]
+}

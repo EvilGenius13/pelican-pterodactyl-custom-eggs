@@ -1,0 +1,24 @@
+name: Cleanup GHCR Images
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # Run weekly on Sunday at midnight
+
+jobs:
+  delete-old-versions:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    
+    steps:
+      - name: Delete all but latest container
+        uses: snok/container-retention-policy@v3.0.0
+        with:
+          # Need to add images as we make new ones
+          image-names: fusionfall, shso
+          cut-off: 0s
+          keep-n-most-recent: 0
+          image-tags: "!latest"
+          account: user
+          token: ${{ secrets.GITHUB_TOKEN }}
