@@ -594,7 +594,7 @@ CREATE TABLE `user_prefs` (
 /*!50003 SET character_set_results = utf8mb4 */ ;
 /*!50003 SET collation_connection  = utf8mb4_unicode_ci */ ;
 DELIMITER ;;
-CREATE DEFINER=`root`@`localhost` FUNCTION `CalculateSquadLevel`(ID INT) RETURNS int
+CREATE FUNCTION `CalculateSquadLevel`(ID INT) RETURNS int
     READS SQL DATA
 BEGIN
     DECLARE totalSquadLevel INT DEFAULT 0;
@@ -628,7 +628,7 @@ DELIMITER ;
 /*!50003 SET character_set_results = utf8mb4 */ ;
 /*!50003 SET collation_connection  = utf8mb4_unicode_ci */ ;
 DELIMITER ;;
-CREATE DEFINER=`root`@`localhost` FUNCTION `getlvl`( xp INT ) RETURNS int
+CREATE FUNCTION `getlvl`( xp INT ) RETURNS int
     NO SQL
 BEGIN
     IF xp >=0 AND xp < 100 THEN

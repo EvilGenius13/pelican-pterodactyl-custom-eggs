@@ -128,10 +128,6 @@ chmod +x sf-notification/Server/sfs
 # Env vars provided by Pterodactyl:
 # DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD
 # GAME_PORT, NOTIF_PORT
-
-configure_xml() {
-    local FOLDER="$1"
-  GAME_PORT, NOTIF_PORT
 # We ignore DB vars now because we enforce localhost
 
 configure_xml() {
