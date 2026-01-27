@@ -18,14 +18,24 @@ setup_internal_db() {
     # Initialize MariaDB data directory if empty (checks for 'mysql' folder)
     if [ ! -d "$MYSQL_HOME/mysql" ]; then
         echo "Initializing MariaDB data directory..."
+        
+        # Try finding the install command (it varies by version/distro)
+        INSTALLER="mysql_install_db"
+        if command -v mariadb-install-db >/dev/null 2>&1; then
+            INSTALLER="mariadb-install-db"
+        fi
+        
+        echo "Using installer: $INSTALLER"
+        
         # We ensure auth-root-authentication-method=normal so we can log in without sudo
         # We redirect output to console now so we can see if it fails
-        mysql_install_db --user=container --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal --basedir=/usr >/dev/null 2>&1
+        # Added --skip-test-db and --cross-bootstrap (sometimes helps in containers)
+        $INSTALLER --user=container --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal --skip-test-db --basedir=/usr >/dev/null 2>&1
         
         # Double check if it actually worked
         if [ ! -d "$MYSQL_HOME/mysql" ]; then
-            echo "First initialization failed, trying without basedir..."
-            mysql_install_db --user=container --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal
+            echo "First initialization failed! Retrying with verbose output..."
+            $INSTALLER --user=container --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal --skip-test-db --verbose
         fi
     fi
 
