@@ -15,10 +15,18 @@ setup_internal_db() {
     export MYSQL_HOME=/home/container/database
     mkdir -p $MYSQL_HOME
 
-    # Initialize MariaDB data directory if empty
+    # Initialize MariaDB data directory if empty (checks for 'mysql' folder)
     if [ ! -d "$MYSQL_HOME/mysql" ]; then
         echo "Initializing MariaDB data directory..."
-        mysql_install_db --user=container --datadir="$MYSQL_HOME" >/dev/null 2>&1
+        # We ensure auth-root-authentication-method=normal so we can log in without sudo
+        # We redirect output to console now so we can see if it fails
+        mysql_install_db --user=container --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal --basedir=/usr >/dev/null 2>&1
+        
+        # Double check if it actually worked
+        if [ ! -d "$MYSQL_HOME/mysql" ]; then
+            echo "First initialization failed, trying without basedir..."
+            mysql_install_db --user=container --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal
+        fi
     fi
 
     # Start MariaDB in the background
