@@ -27,6 +27,11 @@ copy_if_missing() {
 copy_if_missing "sf-game"
 copy_if_missing "sf-notification"
 
+# Make the database sample file easily accessible
+if [ -f "/home/container/sf-game/SHSO_sample_DB.sql" ] && [ ! -f "/home/container/SHSO_sample_DB.sql" ]; then
+    cp "/home/container/sf-game/SHSO_sample_DB.sql" "/home/container/SHSO_sample_DB.sql"
+fi
+
 # Ensure binaries are executable
 chmod +x sf-game/Server/sfs
 chmod +x sf-notification/Server/sfs
@@ -39,32 +44,35 @@ chmod +x sf-notification/Server/sfs
 
 # Env vars provided by Pterodactyl:
 # DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD
+# GAME_PORT, NOTIF_PORT
 
 configure_xml() {
-    local FILE="$1/Server/config.xml"
+    local FOLDER="$1"
+    local SERVER_PORT="$2"
+    local FILE="$FOLDER/Server/config.xml"
     
     if [ -f "$FILE" ]; then
-        echo "Configuring $FILE..."
+        echo "Configuring $FILE with port $SERVER_PORT..."
         
         # Replace Connection String
-        # Look for jdbc:mysql://... and replace up to the ? or "
-        # Pattern: jdbc:mysql://[host]:[port]/[database]
+        # Pattern: <ConnectionString>jdbc:mysql://[host]:[port]/[database]...</ConnectionString>
         
-        # We assume the default config has "127.0.0.1:3306/shso" or similar.
-        # We will brutally replace the JDBC URL block.
-        
-        sed -i "s|jdbc:mysql://.*/.*</driver>|jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_DATABASE}</driver>|g" "$FILE"
+        sed -i "s|<ConnectionString>.*</ConnectionString>|<ConnectionString>jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_DATABASE}?useSSL=false</ConnectionString>|g" "$FILE"
         sed -i "s|<UserName>.*</UserName>|<UserName>${DB_USERNAME}</UserName>|g" "$FILE"
         sed -i "s|<Password>.*</Password>|<Password>${DB_PASSWORD}</Password>|g" "$FILE"
+
+        # Update Server Port
+        # Pattern: <ServerPort>9339</ServerPort>
+        sed -i "s|<ServerPort>.*</ServerPort>|<ServerPort>${SERVER_PORT}</ServerPort>|g" "$FILE"
         
-        echo "Updated database config for $1."
+        echo "Updated configuration for $FOLDER."
     else
         echo "WARNING: Config file $FILE not found!"
     fi
 }
 
-configure_xml "sf-game"
-configure_xml "sf-notification"
+configure_xml "sf-game" "${GAME_PORT:-9339}"
+configure_xml "sf-notification" "${NOTIF_PORT:-9389}"
 
 # -----------------------------------------------------------------------------
 # 3. Startup
