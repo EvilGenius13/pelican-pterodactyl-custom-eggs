@@ -27,6 +27,11 @@ setup_internal_db() {
     
     # Wait for DB to come alive
     echo "Waiting for MariaDB to be ready..."
+    local i=0
+    while ! mysqladmin ping --socket="$MYSQL_HOME/mysql.sock" --silent; do
+        sleep 1
+        i=$((i+1))
+        if [ $i -ge 30 ]; then
              echo "MariaDB failed to start within 30 seconds."
              exit 1
         fi
