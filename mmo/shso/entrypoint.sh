@@ -30,12 +30,14 @@ setup_internal_db() {
         # We ensure auth-root-authentication-method=normal so we can log in without sudo
         # We redirect output to console now so we can see if it fails
         # Added --skip-test-db and --cross-bootstrap (sometimes helps in containers)
-        $INSTALLER --user=container --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal --skip-test-db --basedir=/usr >/dev/null 2>&1
+        # REMOVING --user=container because we are already running as non-root and cannot chown
+        # Added --force so it doesn't fail if a previous attempt left 'ibdata1' but no tables
+        $INSTALLER --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal --skip-test-db --basedir=/usr --force >/dev/null 2>&1
         
         # Double check if it actually worked
         if [ ! -d "$MYSQL_HOME/mysql" ]; then
             echo "First initialization failed! Retrying with verbose output..."
-            $INSTALLER --user=container --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal --skip-test-db --verbose
+            $INSTALLER --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal --skip-test-db --basedir=/usr --force --verbose
         fi
     fi
 
