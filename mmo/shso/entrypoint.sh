@@ -25,7 +25,8 @@ setup_internal_db() {
     echo "Starting MariaDB..."
     # We use --skip-networking to ensure it binds ONLY to localhost (security/collision avoidance)
     # We pass --port=3306 explicitly just in case config defaults vary
-    /usr/bin/mysqld_safe --datadir="$MYSQL_HOME" --pid-file="$MYSQL_HOME/mariadb.pid" --socket="$MYSQL_HOME/mysql.sock" --port=3306 --user=container --no-watch --silent-startup --skip-networking=0
+    # Added --skip-syslog and --log-error to debug startup issues and prevent hangs
+    /usr/bin/mysqld_safe --datadir="$MYSQL_HOME" --pid-file="$MYSQL_HOME/mariadb.pid" --socket="$MYSQL_HOME/mysql.sock" --port=3306 --user=container --no-watch --log-error="$MYSQL_HOME/mariadb.err" --skip-syslog --skip-networking=0
     
     # Wait for DB to come alive
     echo "Waiting for MariaDB to be ready..."
@@ -35,6 +36,11 @@ setup_internal_db() {
         i=$((i+1))
         if [ $i -ge 30 ]; then
              echo "MariaDB failed to start within 30 seconds."
+             if [ -f "$MYSQL_HOME/mariadb.err" ]; then
+                 echo "--- MariaDB Error Log ---"
+                 cat "$MYSQL_HOME/mariadb.err"
+                 echo "-------------------------"
+             fi
              exit 1
         fi
     done
