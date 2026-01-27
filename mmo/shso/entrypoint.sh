@@ -23,7 +23,7 @@ setup_internal_db() {
 
     # Start MariaDB in the background
     echo "Starting MariaDB..."
-    /usr/bin/mysqld_safe --datadir="$MYSQL_HOME" --user=container --no-watch --silent-startup
+    /usr/bin/mysqld_safe --datadir="$MYSQL_HOME" --pid-file="$MYSQL_HOME/mariadb.pid" --socket="$MYSQL_HOME/mysql.sock" --user=container --no-watch --silent-startup
     
     # Wait for DB to come alive
     echo "Waiting for MariaDB to be ready..."
