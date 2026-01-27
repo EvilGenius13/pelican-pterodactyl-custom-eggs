@@ -84,8 +84,18 @@ fix_wrapper_conf() {
     
     if [ -f "$CONF" ]; then
         echo "Updating Java path in $CONF..."
+        
+        # Get absolute path to Java to prevent "No such file or directory" errors
+        # The wrapper sometimes struggles with just 'java' if PATH isn't inherited perfectly
+        local JAVA_PATH=$(which java)
+        
+        if [ -z "$JAVA_PATH" ]; then
+            JAVA_PATH="java" # Fallback
+        fi
+        
         # Force wrapper to use the system java executable
-        sed -i 's|^wrapper.java.command=.*|wrapper.java.command=java|g' "$CONF"
+        # We match broadly to catch commented out or weirdly formatted lines
+        sed -i "s|^.*wrapper.java.command=.*|wrapper.java.command=${JAVA_PATH}|g" "$CONF"
     else
         echo "WARNING: Wrapper config $CONF not found!"
     fi
