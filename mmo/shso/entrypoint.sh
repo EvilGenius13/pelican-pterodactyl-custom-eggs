@@ -149,7 +149,7 @@ configure_xml() {
         
         sed -i "s|<ConnectionString>.*</ConnectionString>|<ConnectionString>jdbc:mysql://127.0.0.1:3306/shso?useSSL=false\&amp;allowPublicKeyRetrieval=true</ConnectionString>|g" "$FILE"
         sed -i "s|<UserName>.*</UserName>|<UserName>shso</UserName>|g" "$FILE"
-        sed -i "s|<Password>.*</Password>|<Password>shso
+        sed -i "s|<Password>.*</Password>|<Password>shso</Password>|g" "$FILE"
         echo "Updated configuration for $FOLDER."
     else
         echo "WARNING: Config file $FILE not found!"
@@ -187,9 +187,6 @@ fix_wrapper_conf() {
 }
 
 fix_wrapper_conf "sf-game"
-fi(Removed external DB Init section here as it's now handled top of script)se
-    echo "WARNING: 'mysql' command not found, skipping DB auto-init."
-fi
 
 # -----------------------------------------------------------------------------
 # 3. Startup

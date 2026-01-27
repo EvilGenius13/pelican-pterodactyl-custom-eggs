@@ -42,9 +42,9 @@ RUN chmod +x sf-game/Server/sfs sf-notification/Server/sfs
 # Setup Pterodactyl User
 RUN useradd -m -d /home/container container
 
-# Ensure all files in /opt/shso are owned by the container user
-# This fixes "Permission denied" errors during copy
-RUN chown -R container:container /opt/shso
+# Ensure all files in /opt/shso are owned by the container user and world-readable/executable
+# This fixes "Permission denied" errors if Pterodactyl uses a different UID or if copy attributes are strict
+RUN chown -R container:container /opt/shso && chmod -R 755 /opt/shso
 
 USER container
 ENV USER=container HOME=/home/container

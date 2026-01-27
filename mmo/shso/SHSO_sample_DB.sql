@@ -592,7 +592,7 @@ CREATE TABLE `user_prefs` (
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
 /*!50003 SET character_set_client  = utf8mb4 */ ;
 /*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
+/*!50003 SET collation_connection  = utf8mb4_unicode_ci */ ;
 DELIMITER ;;
 CREATE DEFINER=`root`@`localhost` FUNCTION `CalculateSquadLevel`(ID INT) RETURNS int
     READS SQL DATA
@@ -626,7 +626,7 @@ DELIMITER ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
 /*!50003 SET character_set_client  = utf8mb4 */ ;
 /*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
+/*!50003 SET collation_connection  = utf8mb4_unicode_ci */ ;
 DELIMITER ;;
 CREATE DEFINER=`root`@`localhost` FUNCTION `getlvl`( xp INT ) RETURNS int
     NO SQL
