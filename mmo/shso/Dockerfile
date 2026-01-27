@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     tar \
     iproute2 \
+    mariadb-client \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/shso
@@ -31,6 +32,9 @@ RUN git clone https://github.com/SHSUnderground/shso-server.git /tmp/shso-repo
 RUN cp -r /tmp/shso-repo/* sf-game/ \
     && cp -r /tmp/shso-repo/* sf-notification/ \
     && rm -rf /tmp/shso-repo
+
+# Overwrite the sample DB with our sanitized local version (removes CREATE DATABASE/USE shso)
+COPY ./SHSO_sample_DB.sql sf-game/SHSO_sample_DB.sql
 
 # Fix permissions for the server binaries
 RUN chmod +x sf-game/Server/sfs sf-notification/Server/sfs
