@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     tar \
     iproute2 \
-    mariadb-client \
+    mariadb-server \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/shso

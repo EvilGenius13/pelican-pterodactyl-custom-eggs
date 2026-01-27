@@ -29,56 +29,6 @@
     },
     "variables": [
         {
-            "name": "Database Host",
-            "description": "Hostname for the MySQL database connection.",
-            "env_variable": "DB_HOST",
-            "default_value": "127.0.0.1",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|string",
-            "field_type": "text"
-        },
-        {
-            "name": "Database Port",
-            "description": "Port for the MySQL database connection.",
-            "env_variable": "DB_PORT",
-            "default_value": "3306",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|integer",
-            "field_type": "text"
-        },
-        {
-            "name": "Database Name",
-            "description": "Name of the MySQL database.",
-            "env_variable": "DB_DATABASE",
-            "default_value": "shso",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|string",
-            "field_type": "text"
-        },
-        {
-            "name": "Database Username",
-            "description": "Username for the MySQL connection.",
-            "env_variable": "DB_USERNAME",
-            "default_value": "shso",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|string",
-            "field_type": "text"
-        },
-        {
-            "name": "Database Password",
-            "description": "Password for the MySQL connection.",
-            "env_variable": "DB_PASSWORD",
-            "default_value": "",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "nullable|string",
-            "field_type": "text"
-        },
-        {
             "name": "Game Port",
             "description": "Main TCP port for the Game server.",
             "env_variable": "GAME_PORT",

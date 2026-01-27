@@ -5,6 +5,56 @@
 cd /home/container
 
 # -----------------------------------------------------------------------------
+# 0. Integrated Database Setup (Embedded MariaDB)
+# -----------------------------------------------------------------------------
+# Since we are running "All-in-One", we need to manage our own SQL server.
+# We store data in /home/container/database so it persists across restarts.
+
+setup_internal_db() {
+    echo "--- Configuring Internal Database ---"
+    export MYSQL_HOME=/home/container/database
+    mkdir -p $MYSQL_HOME
+
+    # Initialize MariaDB data directory if empty
+    if [ ! -d "$MYSQL_HOME/mysql" ]; then
+        echo "Initializing MariaDB data directory..."
+        mysql_install_db --user=container --datadir="$MYSQL_HOME" >/dev/null 2>&1
+    fi
+
+    # Start MariaDB in the background
+    echo "Starting MariaDB..."
+    /usr/bin/mysqld_safe --datadir="$MYSQL_HOME" --user=container --no-watch --silent-startup
+    
+    # Wait for DB to come alive
+    echo "Waiting for MariaDB to be ready..."
+             echo "MariaDB failed to start within 30 seconds."
+             exit 1
+        fi
+    done
+    echo "MariaDB is UP."
+
+    # Create User and Database if they don't exist
+    # We use a hardcoded local user since this DB is not exposed externally anyway.
+    mysql --socket="$MYSQL_HOME/mysql.sock" -u root -e "CREATE DATABASE IF NOT EXISTS shso;"
+    mysql --socket="$MYSQL_HOME/mysql.sock" -u root -e "CREATE USER IF NOT EXISTS 'shso'@'localhost' IDENTIFIED BY 'shso';"
+    mysql --socket="$MYSQL_HOME/mysql.sock" -u root -e "GRANT ALL PRIVILEGES ON shso.* TO 'shso'@'localhost';"
+    mysql --socket="$MYSQL_HOME/mysql.sock" -u root -e "FLUSH PRIVILEGES;"
+
+    # Import Schema if 'users' table is missing
+    if ! mysql --socket="$MYSQL_HOME/mysql.sock" -u shso -pshso -D shso -e "DESCRIBE users;" >/dev/null 2>&1; then
+        echo "Empty database detected. Importing initial schema..."
+        if [ -f "/opt/shso/sf-game/SHSO_sample_DB.sql" ]; then
+            mysql --socket="$MYSQL_HOME/mysql.sock" -u shso -pshso shso < "/opt/shso/sf-game/SHSO_sample_DB.sql"
+            echo "Import successful."
+        else
+            echo "WARNING: SQL sample file missing. Database is empty."
+        fi
+    fi
+}
+
+setup_internal_db
+
+# -----------------------------------------------------------------------------
 # 1. File Synchronization
 # -----------------------------------------------------------------------------
 # Copy server files from the image to the volume if they don't exist.
@@ -48,23 +98,25 @@ chmod +x sf-notification/Server/sfs
 
 configure_xml() {
     local FOLDER="$1"
+  GAME_PORT, NOTIF_PORT
+# We ignore DB vars now because we enforce localhost
+
+configure_xml() {
+    local FOLDER="$1"
     local SERVER_PORT="$2"
     local FILE="$FOLDER/Server/config.xml"
     
     if [ -f "$FILE" ]; then
         echo "Configuring $FILE with port $SERVER_PORT..."
         
-        # Replace Connection String
-        # Pattern: <ConnectionString>jdbc:mysql://[host]:[port]/[database]...</ConnectionString>
+        # Force Localhost Connection for Internal DB
+        # We also need to specify the socket if using localhost sometimes, but SFS usually uses TCP (127.0.0.1:3306)
+        # Note: In 'setup_internal_db' we started mysqld without networking by default? 
+        # Actually mysqld_safe usually binds 3306. We need to make sure config.xml uses 127.0.0.1
         
-        sed -i "s|<ConnectionString>.*</ConnectionString>|<ConnectionString>jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_DATABASE}?useSSL=false</ConnectionString>|g" "$FILE"
-        sed -i "s|<UserName>.*</UserName>|<UserName>${DB_USERNAME}</UserName>|g" "$FILE"
-        sed -i "s|<Password>.*</Password>|<Password>${DB_PASSWORD}</Password>|g" "$FILE"
-
-        # Update Server Port
-        # Pattern: <ServerPort>9339</ServerPort>
-        sed -i "s|<ServerPort>.*</ServerPort>|<ServerPort>${SERVER_PORT}</ServerPort>|g" "$FILE"
-        
+        sed -i "s|<ConnectionString>.*</ConnectionString>|<ConnectionString>jdbc:mysql://127.0.0.1:3306/shso?useSSL=false\&amp;allowPublicKeyRetrieval=true</ConnectionString>|g" "$FILE"
+        sed -i "s|<UserName>.*</UserName>|<UserName>shso</UserName>|g" "$FILE"
+        sed -i "s|<Password>.*</Password>|<Password>shso
         echo "Updated configuration for $FOLDER."
     else
         echo "WARNING: Config file $FILE not found!"
@@ -102,41 +154,7 @@ fix_wrapper_conf() {
 }
 
 fix_wrapper_conf "sf-game"
-fix_wrapper_conf "sf-notification"
-
-# -----------------------------------------------------------------------------
-# 2.8. Database Initialization
-# -----------------------------------------------------------------------------
-# Check if the database is populated. If not, try to import the sample DB.
-init_db() {
-    echo "Checking database state..."
-    # Try to list the 'users' table. Default SHSO DB has a 'users' table.
-    # We suppress output; we just care about the exit code.
-    if mysql -u"${DB_USERNAME}" -p"${DB_PASSWORD}" -h"${DB_HOST}" "${DB_DATABASE}" -e "DESCRIBE users;" >/dev/null 2>&1; then
-        echo "Database check: 'users' table detected. Skipping import."
-    else
-        echo "Database check: Table 'users' not found. Attempting to populate database..."
-        
-        if [ -f "/home/container/SHSO_sample_DB.sql" ]; then
-             echo "Importing SHSO_sample_DB.sql..."
-             # Process the import
-             mysql -u"${DB_USERNAME}" -p"${DB_PASSWORD}" -h"${DB_HOST}" "${DB_DATABASE}" < "/home/container/SHSO_sample_DB.sql"
-             
-             if [ $? -eq 0 ]; then
-                echo "Database import successful!"
-             else
-                echo "ERROR: Database import failed. Check credentials or connection."
-             fi
-        else
-             echo "WARNING: /home/container/SHSO_sample_DB.sql not found. Cannot auto-setup database."
-        fi
-    fi
-}
-
-# Run the DB check (requires mariadb-client installed in Dockerfile)
-if command -v mysql >/dev/null 2>&1; then
-    init_db
-else
+fi(Removed external DB Init section here as it's now handled top of script)se
     echo "WARNING: 'mysql' command not found, skipping DB auto-init."
 fi
 
