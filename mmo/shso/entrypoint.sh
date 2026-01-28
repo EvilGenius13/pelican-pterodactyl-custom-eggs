@@ -177,6 +177,18 @@ fix_wrapper_conf() {
         # Force wrapper to use the system java executable
         # We match broadly to catch commented out or weirdly formatted lines
         sed -i "s|^.*wrapper.java.command=.*|wrapper.java.command=${JAVA_PATH}|g" "$CONF"
+
+        # FIX: Ensure wrapper.jar is in classpath with absolute path
+        # The default relative path often fails in Docker/Pterodactyl environments
+        local WRAPPER_JAR=$(find "$FOLDER/Server" -name "wrapper.jar" | head -n 1)
+        if [ -n "$WRAPPER_JAR" ]; then
+             echo "Found wrapper.jar at $WRAPPER_JAR. Updating wrapper.conf..."
+             # Force the first classpath entry to be the absolute path to wrapper.jar
+             sed -i "s|^wrapper.java.classpath.1=.*|wrapper.java.classpath.1=${WRAPPER_JAR}|g" "$CONF"
+        else
+             echo "WARNING: wrapper.jar not found in $FOLDER/Server! Debugging listing:"
+             find "$FOLDER/Server" -maxdepth 3
+        fi
     else
         echo "WARNING: Wrapper config $CONF not found!"
     fi
