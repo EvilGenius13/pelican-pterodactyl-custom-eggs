@@ -175,37 +175,42 @@ fix_wrapper_conf() {
         fi
         
         # Force wrapper to use the system java executable
-        # We match broadly to catch commented out or weirdly formatted lines
         sed -i "s|^.*wrapper.java.command=.*|wrapper.java.command=${JAVA_PATH}|g" "$CONF"
 
-        # Force wrapper to use the system java executable
-        # We match broadly to catch commented out or weirdly formatted lines
-        sed -i "s|^.*wrapper.java.command=.*|wrapper.java.command=${JAVA_PATH}|g" "$CONF"
+        # --- FIX 1: Explicitly set absolute paths for Critical Jars ---
+        # The wrapper fails if it defines jars using relative paths (like lib/foo.jar) 
+        # because the working directory inside the container might drift or simply fail to resolve.
+        
+        # Helper to find and set absolute path for a specific jar
+        set_abs_jar() {
+            local JAR_NAME="$1"
+            local SEARCH_PATH="$2"
+            local CONF_FILE="$3"
+            
+            local FOUND_REL_PATH=$(find "$SEARCH_PATH" -name "$JAR_NAME" | head -n 1)
+            if [ -n "$FOUND_REL_PATH" ]; then
+                local ABS_PATH="/home/container/${FOUND_REL_PATH}"
+                echo "Fixing path for $JAR_NAME -> $ABS_PATH"
+                # Scan for any classpath line containing this jar name (e.g. ...=lib/smartfoxserver.jar)
+                # and replace everything after the '=' with the absolute path
+                sed -i "s|=.*${JAR_NAME}|=${ABS_PATH}|" "$CONF_FILE"
+            else
+                echo "WARNING: $JAR_NAME not found in $SEARCH_PATH"
+            fi
+        }
 
-        # FIX: Bulk fix for all library paths to be absolute
-        # This prevents ClassNotFoundException for the main application jars (smartfoxserver.jar, etc)
-        local ABS_LIB_PATH="/home/container/$FOLDER/Server/lib/"
-        echo "Updating all classpath entries to use absolute path: $ABS_LIB_PATH"
-        # We handle both "lib/" and "./lib/" cases just in case
-        sed -i "s|=lib/|=${ABS_LIB_PATH}|g" "$CONF"
-        sed -i "s|=./lib/|=${ABS_LIB_PATH}|g" "$CONF"
+        set_abs_jar "wrapper.jar" "$FOLDER/Server" "$CONF"
+        set_abs_jar "smartfoxserver.jar" "$FOLDER/Server" "$CONF"
+        set_abs_jar "jdom.jar" "$FOLDER/Server" "$CONF"
+        set_abs_jar "json.jar" "$FOLDER/Server" "$CONF"
+        set_abs_jar "commons-pool-1.2.jar" "$FOLDER/Server" "$CONF"
+        set_abs_jar "commons-dbcp-1.2.1.jar" "$FOLDER/Server" "$CONF"
+        set_abs_jar "commons-collections-3.1.jar" "$FOLDER/Server" "$CONF"
 
-        # FIX: Ensure wrapper.jar is in classpath with absolute path
-        # The default relative path often fails in Docker/Pterodactyl environments
-        local WRAPPER_JAR=$(find "$FOLDER/Server" -name "wrapper.jar" | head -n 1)
-        if [ -n "$WRAPPER_JAR" ]; then
-             # The find command returns a path relative to current dir (e.g., sf-game/Server/lib/wrapper.jar)
-             # We must prepend the absolute PWD (/home/container) or the wrapper (running from inside Server dir) won't find it.
-             local ABS_WRAPPER_JAR="/home/container/${WRAPPER_JAR}"
-             
-             echo "Found wrapper.jar at $WRAPPER_JAR. Updating wrapper.conf with absolute path: $ABS_WRAPPER_JAR..."
-             
-             # Force the first classpath entry to be the absolute path to wrapper.jar
-             sed -i "s|^wrapper.java.classpath.1=.*|wrapper.java.classpath.1=${ABS_WRAPPER_JAR}|g" "$CONF"
-        else
-             echo "WARNING: wrapper.jar not found in $FOLDER/Server! Debugging listing:"
-             find "$FOLDER/Server" -maxdepth 3
-        fi
+        # --- DEBUG: Print Status ---
+        echo "--- Final Wrapper Config Environment ($FOLDER) ---"
+        grep "wrapper.java.classpath" "$CONF"
+        echo "------------------------------------------------"
     else
         echo "WARNING: Wrapper config $CONF not found!"
     fi
