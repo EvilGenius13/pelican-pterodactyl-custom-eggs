@@ -178,6 +178,18 @@ fix_wrapper_conf() {
         # We match broadly to catch commented out or weirdly formatted lines
         sed -i "s|^.*wrapper.java.command=.*|wrapper.java.command=${JAVA_PATH}|g" "$CONF"
 
+        # Force wrapper to use the system java executable
+        # We match broadly to catch commented out or weirdly formatted lines
+        sed -i "s|^.*wrapper.java.command=.*|wrapper.java.command=${JAVA_PATH}|g" "$CONF"
+
+        # FIX: Bulk fix for all library paths to be absolute
+        # This prevents ClassNotFoundException for the main application jars (smartfoxserver.jar, etc)
+        local ABS_LIB_PATH="/home/container/$FOLDER/Server/lib/"
+        echo "Updating all classpath entries to use absolute path: $ABS_LIB_PATH"
+        # We handle both "lib/" and "./lib/" cases just in case
+        sed -i "s|=lib/|=${ABS_LIB_PATH}|g" "$CONF"
+        sed -i "s|=./lib/|=${ABS_LIB_PATH}|g" "$CONF"
+
         # FIX: Ensure wrapper.jar is in classpath with absolute path
         # The default relative path often fails in Docker/Pterodactyl environments
         local WRAPPER_JAR=$(find "$FOLDER/Server" -name "wrapper.jar" | head -n 1)
