@@ -182,9 +182,14 @@ fix_wrapper_conf() {
         # The default relative path often fails in Docker/Pterodactyl environments
         local WRAPPER_JAR=$(find "$FOLDER/Server" -name "wrapper.jar" | head -n 1)
         if [ -n "$WRAPPER_JAR" ]; then
-             echo "Found wrapper.jar at $WRAPPER_JAR. Updating wrapper.conf..."
+             # The find command returns a path relative to current dir (e.g., sf-game/Server/lib/wrapper.jar)
+             # We must prepend the absolute PWD (/home/container) or the wrapper (running from inside Server dir) won't find it.
+             local ABS_WRAPPER_JAR="/home/container/${WRAPPER_JAR}"
+             
+             echo "Found wrapper.jar at $WRAPPER_JAR. Updating wrapper.conf with absolute path: $ABS_WRAPPER_JAR..."
+             
              # Force the first classpath entry to be the absolute path to wrapper.jar
-             sed -i "s|^wrapper.java.classpath.1=.*|wrapper.java.classpath.1=${WRAPPER_JAR}|g" "$CONF"
+             sed -i "s|^wrapper.java.classpath.1=.*|wrapper.java.classpath.1=${ABS_WRAPPER_JAR}|g" "$CONF"
         else
              echo "WARNING: wrapper.jar not found in $FOLDER/Server! Debugging listing:"
              find "$FOLDER/Server" -maxdepth 3
