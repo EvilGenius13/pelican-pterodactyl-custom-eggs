@@ -177,55 +177,65 @@ fix_wrapper_conf() {
         # Force wrapper to use the system java executable
         sed -i "s|^.*wrapper.java.command=.*|wrapper.java.command=${JAVA_PATH}|g" "$CONF"
 
-        # --- FIX 1: Explicitly set absolute paths for Critical Jars ---
-        # The wrapper fails if it defines jars using relative paths (like lib/foo.jar) 
-        # because the working directory inside the container might drift or simply fail to resolve.
+        # --- FIX: Completely Rebuild Classpath to avoid Gaps and Missing Jars ---
+        echo "Rebuilding Classpath for $FOLDER..."
         
-        # Helper to find and set absolute path for a specific jar
-        set_abs_jar() {
-            local JAR_NAME="$1"
-            local SEARCH_PATH="$2"
-            local CONF_FILE="$3"
-            
-            # Use -iname for case-insensitive search
-            local FOUND_REL_PATH=$(find "$SEARCH_PATH" -iname "$JAR_NAME" | head -n 1)
-            if [ -n "$FOUND_REL_PATH" ]; then
-                local ABS_PATH="/home/container/${FOUND_REL_PATH}"
-                # We need to escape special characters for sed
-                local SAFE_ABS_PATH=$(echo "$ABS_PATH" | sed 's/[\/&]/\\&/g')
-                
-                echo "Fixing path for $JAR_NAME -> $ABS_PATH"
-                
-                # Scan for any classpath line containing this jar name (case-insensitive match in sed is tricky, so we rely on the specific filename we're looking for but use the found name for the path)
-                # However, the config file might have "SmartFoxServer.jar" key.
-                # simpler approach: Replace the line containing the jar name regardless of case
-                
-                # We use grep to find the line number, then sed to replace that line
-                local LINE_NUM=$(grep -in "$JAR_NAME" "$CONF_FILE" | cut -d: -f1 | head -n 1)
-                
-                if [ -n "$LINE_NUM" ]; then
-                     # Preserve the property name (wrapper.java.classpath.N)
-                     sed -i "${LINE_NUM}s|=.*|=${SAFE_ABS_PATH}|" "$CONF_FILE"
-                else
-                     echo "WARNING: Could not find entry for $JAR_NAME in $CONF_FILE to replace."
-                fi
-            else
-                echo "WARNING: $JAR_NAME not found in $SEARCH_PATH"
-            fi
-        }
-
-        set_abs_jar "wrapper.jar" "$FOLDER/Server" "$CONF"
-        set_abs_jar "SmartFoxServer.jar" "$FOLDER/Server" "$CONF"
-        set_abs_jar "jdom.jar" "$FOLDER/Server" "$CONF"
-        set_abs_jar "json.jar" "$FOLDER/Server" "$CONF"
-        set_abs_jar "commons-pool-1.2.jar" "$FOLDER/Server" "$CONF"
-        set_abs_jar "commons-dbcp-1.2.1.jar" "$FOLDER/Server" "$CONF"
-        set_abs_jar "commons-collections-3.1.jar" "$FOLDER/Server" "$CONF"
-
+        # 1. Remove all existing classpath entries
+        sed -i '/^wrapper.java.classpath/d' "$CONF"
+        
+        # 2. Start adding new entries
+        # We use absolute paths to ensure Docker/Pterodactyl compat
+        local COUNT=1
+        
+        # Add basic directories
+        echo "wrapper.java.classpath.${COUNT}=./" >> "$CONF"
+        COUNT=$((COUNT+1))
+        echo "wrapper.java.classpath.${COUNT}=./sfsExtensions/" >> "$CONF"
+        COUNT=$((COUNT+1))
+        
+        # Add all JARS from the lib directory using absolute paths
+        local LIB_DIR="/home/container/$FOLDER/Server/lib"
+        
+        if [ -d "$LIB_DIR" ]; then
+             for JAR in "$LIB_DIR"/*.jar; do
+                 # Check if file exists (shell glob expansion safety)
+                 if [ -f "$JAR" ]; then
+                     echo "wrapper.java.classpath.${COUNT}=$JAR" >> "$CONF"
+                     COUNT=$((COUNT+1))
+                 fi
+             done
+             
+             # Also check recursively for jars in subfolders of lib (like jetty, javamail)
+             # SFS often structures libs in subfolders
+             # keys: find all jars, use absolute paths
+             local FILES=$(find "$LIB_DIR" -type f -name "*.jar")
+             # We might have duplicates if we just scanned *.jar above. 
+             # Let's simple reset and do a clean 'find' loop for everything in lib/
+        fi
+        
+        # REDO: Cleaner loop using find only
+        # Remove the previous attempt lines from config if partial (actually we can just overwrite)
+        sed -i '/^wrapper.java.classpath/d' "$CONF"
+        
+        COUNT=1
+        echo "wrapper.java.classpath.${COUNT}=./" >> "$CONF"
+        COUNT=$((COUNT+1))
+        echo "wrapper.java.classpath.${COUNT}=./sfsExtensions/" >> "$CONF"
+        COUNT=$((COUNT+1))
+        
+        # Find all jars in lib recursively
+        # We use process substitution to feed the while loop to persist COUNT variable
+        while IFS= read -r JAR_FILE; do
+             echo "wrapper.java.classpath.${COUNT}=$JAR_FILE" >> "$CONF"
+             COUNT=$((COUNT+1))
+        done < <(find "$LIB_DIR" -type f -name "*.jar")
+        
         # --- DEBUG: Print Status ---
-        echo "--- Final Wrapper Config Environment ($FOLDER) ---"
-        grep "wrapper.java.classpath" "$CONF"
-        echo "------------------------------------------------"
+        echo "--- Rebuilt Classpath ($COUNT entries) ---"
+        grep "wrapper.java.classpath" "$CONF" | head -n 5
+        echo "... (tail) ..."
+        grep "wrapper.java.classpath" "$CONF" | tail -n 5
+        echo "----------------------------------------"
     else
         echo "WARNING: Wrapper config $CONF not found!"
     fi
