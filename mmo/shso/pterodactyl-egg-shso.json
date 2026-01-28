@@ -47,6 +47,16 @@
             "user_editable": true,
             "rules": "required|integer",
             "field_type": "text"
+        },
+        {
+            "name": "Web Server Port",
+            "description": "TCP port for the built-in Web Server (Jetty).",
+            "env_variable": "WEB_PORT",
+            "default_value": "8080",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer",
+            "field_type": "text"
         }
     ]
 }

@@ -7,48 +7,29 @@ cd /home/container
 # -----------------------------------------------------------------------------
 # 0. Integrated Database Setup (Embedded MariaDB)
 # -----------------------------------------------------------------------------
-# Since we are running "All-in-One", we need to manage our own SQL server.
-# We store data in /home/container/database so it persists across restarts.
-
 setup_internal_db() {
     echo "--- Configuring Internal Database ---"
     export MYSQL_HOME=/home/container/database
     mkdir -p $MYSQL_HOME
 
-    # Initialize MariaDB data directory if empty (checks for 'mysql' folder)
     if [ ! -d "$MYSQL_HOME/mysql" ]; then
         echo "Initializing MariaDB data directory..."
-        
-        # Try finding the install command (it varies by version/distro)
         INSTALLER="mysql_install_db"
         if command -v mariadb-install-db >/dev/null 2>&1; then
             INSTALLER="mariadb-install-db"
         fi
         
-        echo "Using installer: $INSTALLER"
-        
-        # We ensure auth-root-authentication-method=normal so we can log in without sudo
-        # We redirect output to console now so we can see if it fails
-        # Added --skip-test-db and --cross-bootstrap (sometimes helps in containers)
-        # REMOVING --user=container because we are already running as non-root and cannot chown
-        # Added --force so it doesn't fail if a previous attempt left 'ibdata1' but no tables
         $INSTALLER --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal --skip-test-db --basedir=/usr --force >/dev/null 2>&1
         
-        # Double check if it actually worked
         if [ ! -d "$MYSQL_HOME/mysql" ]; then
             echo "First initialization failed! Retrying with verbose output..."
             $INSTALLER --datadir="$MYSQL_HOME" --auth-root-authentication-method=normal --skip-test-db --basedir=/usr --force --verbose
         fi
     fi
 
-    # Start MariaDB in the background
     echo "Starting MariaDB..."
-    # We use --skip-networking to ensure it binds ONLY to localhost (security/collision avoidance)
-    # We pass --port=3306 explicitly just in case config defaults vary
-    # Added --skip-syslog and --log-error to debug startup issues and prevent hangs
     /usr/bin/mysqld_safe --datadir="$MYSQL_HOME" --pid-file="$MYSQL_HOME/mariadb.pid" --socket="$MYSQL_HOME/mysql.sock" --port=3306 --user=container --no-watch --log-error="$MYSQL_HOME/mariadb.err" --skip-syslog --skip-networking=0
     
-    # Wait for DB to come alive
     echo "Waiting for MariaDB to be ready..."
     local i=0
     while ! mysqladmin ping --socket="$MYSQL_HOME/mysql.sock" --silent; do
@@ -66,19 +47,19 @@ setup_internal_db() {
     done
     echo "MariaDB is UP."
 
-    # Create User and Database if they don't exist
-    # We use a hardcoded local user since this DB is not exposed externally anyway.
     mysql --socket="$MYSQL_HOME/mysql.sock" -u root -e "CREATE DATABASE IF NOT EXISTS shso;"
     mysql --socket="$MYSQL_HOME/mysql.sock" -u root -e "CREATE USER IF NOT EXISTS 'shso'@'localhost' IDENTIFIED BY 'shso';"
     mysql --socket="$MYSQL_HOME/mysql.sock" -u root -e "GRANT ALL PRIVILEGES ON shso.* TO 'shso'@'localhost';"
     mysql --socket="$MYSQL_HOME/mysql.sock" -u root -e "FLUSH PRIVILEGES;"
 
-    # Import Schema if 'users' table is missing
     if ! mysql --socket="$MYSQL_HOME/mysql.sock" -u shso -pshso -D shso -e "DESCRIBE users;" >/dev/null 2>&1; then
         echo "Empty database detected. Importing initial schema..."
-        if [ -f "/opt/shso/sf-game/SHSO_sample_DB.sql" ]; then
-            mysql --socket="$MYSQL_HOME/mysql.sock" -u shso -pshso shso < "/opt/shso/sf-game/SHSO_sample_DB.sql"
+        if [ -f "/home/container/sf-game/SHSO_sample_DB.sql" ]; then
+            mysql --socket="$MYSQL_HOME/mysql.sock" -u shso -pshso shso < "/home/container/sf-game/SHSO_sample_DB.sql"
             echo "Import successful."
+        elif [ -f "/home/container/SHSO_sample_DB.sql" ]; then
+             mysql --socket="$MYSQL_HOME/mysql.sock" -u shso -pshso shso < "/home/container/SHSO_sample_DB.sql"
+             echo "Import successful."
         else
             echo "WARNING: SQL sample file missing. Database is empty."
         fi
@@ -90,9 +71,6 @@ setup_internal_db
 # -----------------------------------------------------------------------------
 # 1. File Synchronization
 # -----------------------------------------------------------------------------
-# Copy server files from the image to the volume if they don't exist.
-# We do this for both 'sf-game' and 'sf-notification'.
-
 copy_if_missing() {
     local SRC="/opt/shso/$1"
     local DST="/home/container/$1"
@@ -100,52 +78,55 @@ copy_if_missing() {
     if [ ! -d "$DST" ]; then
         echo "Initializing $1..."
         cp -r "$SRC" "$DST"
-    else
-        echo "$1 exists, checking for missing critical files..."
-        # Optional: We could update specific binaries here if we wanted to enforce updates
-        # e.g., cp "$SRC/Server/sfs" "$DST/Server/sfs"
     fi
 }
 
 copy_if_missing "sf-game"
 copy_if_missing "sf-notification"
 
-# Make the database sample file easily accessible
-if [ -f "/home/container/sf-game/SHSO_sample_DB.sql" ] && [ ! -f "/home/container/SHSO_sample_DB.sql" ]; then
-    cp "/home/container/sf-game/SHSO_sample_DB.sql" "/home/container/SHSO_sample_DB.sql"
+# Ensure binaries/scripts are executable
+chmod +x sf-game/Server/sfs sf-game/Server/start.sh
+chmod +x sf-notification/Server/sfs sf-notification/Server/start.sh
+
+# -----------------------------------------------------------------------------
+# 2. Configuration & Fixes
+# -----------------------------------------------------------------------------
+
+# A. Fix Python Paths (Crucial for SHSO)
+# The server scripts use hardcoded relative paths that break in some contexts.
+# We replace them with absolute paths to the container home.
+echo "Applying Python path fixes..."
+SEARCH_PATH="/home/container/sf-game/Server/webserver/webapps/root"
+if [ -d "$SEARCH_PATH" ]; then
+    # Fix 'users' scripts
+    if [ -d "$SEARCH_PATH/rasp/users" ]; then
+        find "$SEARCH_PATH/rasp/users" -type f -name "*.py" -print0 | xargs -0 sed -i "s|sf-game/Server/webserver/webapps/root|/home/container/sf-game/Server/webserver/webapps/root|g"
+    fi
+    # Fix 'data/json' scripts
+    if [ -d "$SEARCH_PATH/rasp/data/json" ]; then
+        find "$SEARCH_PATH/rasp/data/json" -type f -name "*.py" -print0 | xargs -0 sed -i "s|sf-game/Server/webserver/webapps/root|/home/container/sf-game/Server/webserver/webapps/root|g"
+    fi
+else
+    echo "WARNING: Webserver root not found at $SEARCH_PATH"
 fi
 
-# Ensure binaries are executable
-chmod +x sf-game/Server/sfs
-chmod +x sf-notification/Server/sfs
-
-# -----------------------------------------------------------------------------
-# 2. Configuration
-# -----------------------------------------------------------------------------
-# Configure Database Connection in config.xml for both servers.
-# We use sed to replace standard placeholders or existing values.
-
-# Env vars provided by Pterodactyl:
-# DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD
-# GAME_PORT, NOTIF_PORT
-# We ignore DB vars now because we enforce localhost
-
+# B. Configure XMLs (Ports & DB)
 configure_xml() {
     local FOLDER="$1"
     local SERVER_PORT="$2"
-    local FILE="$FOLDER/Server/config.xml"
+    local FILE="/home/container/$FOLDER/Server/config.xml"
     
     if [ -f "$FILE" ]; then
         echo "Configuring $FILE with port $SERVER_PORT..."
         
-        # Force Localhost Connection for Internal DB
-        # We also need to specify the socket if using localhost sometimes, but SFS usually uses TCP (127.0.0.1:3306)
-        # Note: In 'setup_internal_db' we started mysqld without networking by default? 
-        # Actually mysqld_safe usually binds 3306. We need to make sure config.xml uses 127.0.0.1
-        
+        # Configure DB Connection (Always Localhost/Internal)
         sed -i "s|<ConnectionString>.*</ConnectionString>|<ConnectionString>jdbc:mysql://127.0.0.1:3306/shso?useSSL=false\&amp;allowPublicKeyRetrieval=true</ConnectionString>|g" "$FILE"
         sed -i "s|<UserName>.*</UserName>|<UserName>shso</UserName>|g" "$FILE"
         sed -i "s|<Password>.*</Password>|<Password>shso</Password>|g" "$FILE"
+
+        # Configure Server Port
+        sed -i "s|<ServerPort>.*</ServerPort>|<ServerPort>$SERVER_PORT</ServerPort>|g" "$FILE"
+
         echo "Updated configuration for $FOLDER."
     else
         echo "WARNING: Config file $FILE not found!"
@@ -155,93 +136,18 @@ configure_xml() {
 configure_xml "sf-game" "${GAME_PORT:-9339}"
 configure_xml "sf-notification" "${NOTIF_PORT:-9389}"
 
-# -----------------------------------------------------------------------------
-# 2.5. Wrapper Configuration (Fix JVM Path)
-# -----------------------------------------------------------------------------
-# Ensure the wrapper uses the system 'java' command instead of a bundled/relative one.
-fix_wrapper_conf() {
-    local FOLDER="$1"
-    local CONF="$FOLDER/Server/conf/wrapper.conf"
-    
-    if [ -f "$CONF" ]; then
-        echo "Updating Java path in $CONF..."
-        
-        # Get absolute path to Java to prevent "No such file or directory" errors
-        # The wrapper sometimes struggles with just 'java' if PATH isn't inherited perfectly
-        local JAVA_PATH=$(which java)
-        
-        if [ -z "$JAVA_PATH" ]; then
-            JAVA_PATH="java" # Fallback
-        fi
-        
-        # Force wrapper to use the system java executable
-        sed -i "s|^.*wrapper.java.command=.*|wrapper.java.command=${JAVA_PATH}|g" "$CONF"
+# C. Configure Web Port (sf-game only)
+# We update jetty.xml to use the requested WEB_PORT
+WEB_PORT="${WEB_PORT:-8080}"
+JETTY_XML="/home/container/sf-game/Server/webserver/cfg/jetty.xml"
 
-        # --- FIX: Completely Rebuild Classpath to avoid Gaps and Missing Jars ---
-        echo "Rebuilding Classpath for $FOLDER..."
-        
-        # 1. Remove all existing classpath entries
-        sed -i '/^wrapper.java.classpath/d' "$CONF"
-        
-        # 2. Start adding new entries
-        # We use absolute paths to ensure Docker/Pterodactyl compat
-        local COUNT=1
-        
-        # Add basic directories
-        echo "wrapper.java.classpath.${COUNT}=./" >> "$CONF"
-        COUNT=$((COUNT+1))
-        echo "wrapper.java.classpath.${COUNT}=./sfsExtensions/" >> "$CONF"
-        COUNT=$((COUNT+1))
-        
-        # Add all JARS from the lib directory using absolute paths
-        local LIB_DIR="/home/container/$FOLDER/Server/lib"
-        
-        if [ -d "$LIB_DIR" ]; then
-             for JAR in "$LIB_DIR"/*.jar; do
-                 # Check if file exists (shell glob expansion safety)
-                 if [ -f "$JAR" ]; then
-                     echo "wrapper.java.classpath.${COUNT}=$JAR" >> "$CONF"
-                     COUNT=$((COUNT+1))
-                 fi
-             done
-             
-             # Also check recursively for jars in subfolders of lib (like jetty, javamail)
-             # SFS often structures libs in subfolders
-             # keys: find all jars, use absolute paths
-             local FILES=$(find "$LIB_DIR" -type f -name "*.jar")
-             # We might have duplicates if we just scanned *.jar above. 
-             # Let's simple reset and do a clean 'find' loop for everything in lib/
-        fi
-        
-        # REDO: Cleaner loop using find only
-        # Remove the previous attempt lines from config if partial (actually we can just overwrite)
-        sed -i '/^wrapper.java.classpath/d' "$CONF"
-        
-        COUNT=1
-        echo "wrapper.java.classpath.${COUNT}=./" >> "$CONF"
-        COUNT=$((COUNT+1))
-        echo "wrapper.java.classpath.${COUNT}=./sfsExtensions/" >> "$CONF"
-        COUNT=$((COUNT+1))
-        
-        # Find all jars in lib recursively
-        # We use process substitution to feed the while loop to persist COUNT variable
-        while IFS= read -r JAR_FILE; do
-             echo "wrapper.java.classpath.${COUNT}=$JAR_FILE" >> "$CONF"
-             COUNT=$((COUNT+1))
-        done < <(find "$LIB_DIR" -type f -name "*.jar")
-        
-        # --- DEBUG: Print Status ---
-        echo "--- Rebuilt Classpath ($COUNT entries) ---"
-        grep "wrapper.java.classpath" "$CONF" | head -n 5
-        echo "... (tail) ..."
-        grep "wrapper.java.classpath" "$CONF" | tail -n 5
-        echo "----------------------------------------"
-    else
-        echo "WARNING: Wrapper config $CONF not found!"
-    fi
-}
-
-fix_wrapper_conf "sf-game"
+if [ -f "$JETTY_XML" ]; then
+    echo "Configuring Web Server port to $WEB_PORT..."
+    # Jetty XML uses <SystemProperty name="jetty.port" default="80"/>
+    # We can either replace the default value OR rely on -Djetty.port in the start command.
+    # Replacing the default is safer if the start command doesn't propagate args correctly.
+    sed -i "s|name=\"jetty.port\" default=\"[0-9]*\"|name=\"jetty.port\" default=\"$WEB_PORT\"|g" "$JETTY_XML"
+fi
 
 # -----------------------------------------------------------------------------
 # 3. Startup
@@ -251,24 +157,29 @@ echo "Starting SHSO Servers..."
 # Start Notification Server in Background
 echo "Launching Notification Server..."
 cd /home/container/sf-notification/Server
-./sfs start
-# Give it a moment
+# We use nohup to ensure it stays running in background
+nohup ./start.sh > ../logs/notification_start.log 2>&1 &
+NOTIF_PID=$!
+echo "Notification Server PID: $NOTIF_PID"
 sleep 5
 
-# Start Game Server in Foreground (console mode if supported, or start and tail logs)
+# Start Game Server in Foreground
 echo "Launching Game Server..."
 cd /home/container/sf-game/Server
 
-# Try to run in console mode to keep container alive and show logs
-# If 'console' is not a valid command for this version of SFS, we might fail.
-# Standard SFS Pro 1.6.x 'sfs' script usually supports 'console'.
-./sfs console
+# Run start.sh directly.
+# Since start.sh usually ends with the java command, it will take over this process
+# if we exec it. However, we want to trap signals if possible, but for simplicity
+# and compatibility with 'start.sh', we will just run it.
+# Note: start.sh in the repo is: java ... it.gotoandplay.smartfoxserver.SmartFoxServer
+# It logs to console? The config says <ConsoleLoggingLevel>INFO</ConsoleLoggingLevel>.
 
-# If 'console' falls through or isn't supported, we fallback to tailing logs
-if [ $? -ne 0 ]; then
-    echo "Console mode failed or exited. Attempting standard start and log tail..."
-    ./sfs start
-    
-    # Tail both logs to keep container alive and visible
-    tail -f ../logs/smartfox.log ../../../sf-notification/Server/logs/smartfox.log
-fi
+# If we just run ./start.sh, it should output to stdout, which Pterodactyl picks up.
+# We also want to pass -Djetty.port just in case, though we edited the xml.
+# But start.sh might not accept arguments appended to it if it doesn't use "$@".
+# Let's check start.sh content again.
+# It is: java ... SmartFoxServer
+# It does NOT use "$@". So passing args to ./start.sh won't work unless we edit start.sh.
+# But we edited jetty.xml default, so we are good.
+
+exec ./start.sh
