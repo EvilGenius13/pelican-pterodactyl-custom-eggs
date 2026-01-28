@@ -28,9 +28,9 @@ RUN tar -xf SFSPRO_linux64.tar.gz --strip-components=1 -C sf-game \
 RUN git clone https://github.com/SHSUnderground/shso-server.git /tmp/shso-repo
 
 # Overlay the custom server files onto both instances
-# This overwrites the default SFS configuration and adds the extension logic
-RUN cp -r /tmp/shso-repo/* sf-game/ \
-    && cp -r /tmp/shso-repo/* sf-notification/ \
+# We carefully copy only the relevant subfolders from the repo to the respective server instances
+RUN cp -r /tmp/shso-repo/sf-game/* sf-game/ \
+    && cp -r /tmp/shso-repo/sf-notification/* sf-notification/ \
     && rm -rf /tmp/shso-repo
 
 # Overwrite the sample DB with our sanitized local version (removes CREATE DATABASE/USE shso)
