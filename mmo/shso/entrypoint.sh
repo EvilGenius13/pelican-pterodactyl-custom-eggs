@@ -187,20 +187,35 @@ fix_wrapper_conf() {
             local SEARCH_PATH="$2"
             local CONF_FILE="$3"
             
-            local FOUND_REL_PATH=$(find "$SEARCH_PATH" -name "$JAR_NAME" | head -n 1)
+            # Use -iname for case-insensitive search
+            local FOUND_REL_PATH=$(find "$SEARCH_PATH" -iname "$JAR_NAME" | head -n 1)
             if [ -n "$FOUND_REL_PATH" ]; then
                 local ABS_PATH="/home/container/${FOUND_REL_PATH}"
+                # We need to escape special characters for sed
+                local SAFE_ABS_PATH=$(echo "$ABS_PATH" | sed 's/[\/&]/\\&/g')
+                
                 echo "Fixing path for $JAR_NAME -> $ABS_PATH"
-                # Scan for any classpath line containing this jar name (e.g. ...=lib/smartfoxserver.jar)
-                # and replace everything after the '=' with the absolute path
-                sed -i "s|=.*${JAR_NAME}|=${ABS_PATH}|" "$CONF_FILE"
+                
+                # Scan for any classpath line containing this jar name (case-insensitive match in sed is tricky, so we rely on the specific filename we're looking for but use the found name for the path)
+                # However, the config file might have "SmartFoxServer.jar" key.
+                # simpler approach: Replace the line containing the jar name regardless of case
+                
+                # We use grep to find the line number, then sed to replace that line
+                local LINE_NUM=$(grep -in "$JAR_NAME" "$CONF_FILE" | cut -d: -f1 | head -n 1)
+                
+                if [ -n "$LINE_NUM" ]; then
+                     # Preserve the property name (wrapper.java.classpath.N)
+                     sed -i "${LINE_NUM}s|=.*|=${SAFE_ABS_PATH}|" "$CONF_FILE"
+                else
+                     echo "WARNING: Could not find entry for $JAR_NAME in $CONF_FILE to replace."
+                fi
             else
                 echo "WARNING: $JAR_NAME not found in $SEARCH_PATH"
             fi
         }
 
         set_abs_jar "wrapper.jar" "$FOLDER/Server" "$CONF"
-        set_abs_jar "smartfoxserver.jar" "$FOLDER/Server" "$CONF"
+        set_abs_jar "SmartFoxServer.jar" "$FOLDER/Server" "$CONF"
         set_abs_jar "jdom.jar" "$FOLDER/Server" "$CONF"
         set_abs_jar "json.jar" "$FOLDER/Server" "$CONF"
         set_abs_jar "commons-pool-1.2.jar" "$FOLDER/Server" "$CONF"
