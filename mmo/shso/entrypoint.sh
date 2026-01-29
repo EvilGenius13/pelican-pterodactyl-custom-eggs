@@ -117,7 +117,26 @@ configure_xml() {
     local FILE="/home/container/$FOLDER/Server/config.xml"
     
     if [ -f "$FILE" ]; then
-        echo "Configuring $FILE with port $SERVER_PORT..."
+        echo "Configuring $FILE..."
+        
+        # Set Server Port
+        echo " -> Setting ServerPort to $SERVER_PORT"
+        sed -i "s|<ServerPort>.*</ServerPort>|<ServerPort>$SERVER_PORT</ServerPort>|g" "$FILE"
+
+        # Set Web Server Port (Only for sf-game usually)
+        if [ "$FOLDER" == "sf-game" ]; then
+            local WP="${WEB_PORT:-8080}"
+            echo " -> Setting WebServerPort to $WP"
+            # Try SFS config tag
+            sed -i "s|<WebServerPort>.*</WebServerPort>|<WebServerPort>$WP</WebServerPort>|g" "$FILE"
+            
+            # Also check Jetty config
+            local JETTY_CONF="/home/container/$FOLDER/Server/webserver/cfg/jetty.xml"
+            if [ -f "$JETTY_CONF" ]; then
+                 echo " -> Updating Jetty Port in $JETTY_CONF..."
+                 sed -i "s|<Set name=\"Port\">.*</Set>|<Set name=\"Port\">$WP</Set>|g" "$JETTY_CONF"
+            fi
+        fi
         
         # Configure DB Connection (Always Localhost/Internal)
         sed -i "s|<ConnectionString>.*</ConnectionString>|<ConnectionString>jdbc:mysql://127.0.0.1:3306/shso?useSSL=false\&amp;allowPublicKeyRetrieval=true</ConnectionString>|g" "$FILE"
@@ -153,6 +172,14 @@ fi
 # 3. Startup
 # -----------------------------------------------------------------------------
 echo "Starting SHSO Servers..."
+
+# Ensure log directories exist
+if [ ! -d "/home/container/sf-notification/logs" ]; then
+    mkdir -p "/home/container/sf-notification/logs"
+fi
+if [ ! -d "/home/container/sf-game/logs" ]; then
+    mkdir -p "/home/container/sf-game/logs"
+fi
 
 # Start Notification Server in Background
 echo "Launching Notification Server..."
