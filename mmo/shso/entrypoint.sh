@@ -110,6 +110,14 @@ else
     echo "WARNING: Webserver root not found at $SEARCH_PATH"
 fi
 
+# --- FIX: Patch update_files.py to prevent crash on missing assets ---
+UPDATE_SCRIPT="/home/container/sf-game/Server/webserver/webapps/root/rasp/data/json/update_files.py"
+if [ -f "$UPDATE_SCRIPT" ]; then
+    echo "Patching update_files.py to disable asset checks..."
+    # Comment out the line that defines 'general.unity3d' as required
+    sed -i "s|'AssetBundles/Data/general.unity3d':|# 'AssetBundles/Data/general.unity3d':|g" "$UPDATE_SCRIPT"
+fi
+
 # B. Configure XMLs (Ports & DB)
 configure_xml() {
     local FOLDER="$1"
