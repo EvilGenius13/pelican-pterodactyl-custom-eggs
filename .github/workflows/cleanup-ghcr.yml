@@ -13,10 +13,9 @@ jobs:
     
     steps:
       - name: Delete all but latest container
-        uses: snok/container-retention-policy@v3.0.0
+        uses: snok/container-retention-policy@v3.1.0
         with:
-          # Need to add images as we make new ones
-          image-names: fusionfall, shso
+          image-names: "pelican-pterodactyl-custom-eggs/fusionfall"
           cut-off: 0s
           keep-n-most-recent: 0
           image-tags: "!latest"

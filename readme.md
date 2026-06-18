@@ -10,4 +10,3 @@
 * [FreeRealms](mmo/freerealms) In Progress
 * [FusionFall](mmo/fusionfall)
 * [Marvel Heroes](mmo/marvelheroes) In Progress
-* [Super Hero Squad Online](mmo/shso) In Progress
