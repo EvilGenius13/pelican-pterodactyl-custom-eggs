@@ -36,8 +36,8 @@ variables:
       you probably need this.
     env_variable: ANNOUNCE_IP
     default_value: ''
-    user_viewable: false
-    user_editable: false
+    user_viewable: true
+    user_editable: true
     rules: {  }
     sort: 4
   -

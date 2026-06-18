@@ -12,7 +12,7 @@ This repository hosts a Pterodactyl & Pelican Egg for [OpenFusion](https://githu
 
 ## Usage
 
-1. **Download the Egg**: Get `egg-pterodactyl-open-fusion.json` from this repository.
+1. **Download the Egg**: Get `pterodactyl-egg-open-fusion.json` or `egg-open-fusion.yaml` from this repository.
 2. **Import to your game panel**:
    - Go to your game panel (Pterodactyl or Pelican).
    - Import the egg.
@@ -26,6 +26,8 @@ There are a few extra variables that can be set in the panel to configure the se
 - **LOGIN_PORT**: The port for the login server.
 - **SHARD_PORT**: The port for the shard server.
 - **MONITOR_PORT**: The port for the monitor server.
+
+OpenFusion uses separate login and shard TCP ports. The client connects to the login server, then the login server advertises the shard IP and port from `config.ini`. Make sure both the login and shard ports are allocated and reachable from the client network, and set `ANNOUNCE_IP` when the panel allocation IP is not the address clients should use.
 
 ## Credits
 

@@ -1,18 +1,13 @@
 FROM debian:bookworm-slim AS builder
 
 RUN apt-get update && apt-get install -y \
-    git cmake make clang libsqlite3-dev \
+    git ca-certificates clang build-essential libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 RUN git clone --recurse-submodules https://github.com/OpenFusionProject/OpenFusion.git .
 
-RUN mkdir build && cd build \
-    && cmake .. \
-    && make
-
-# Find the binary and move it to a known spot
-RUN find /build -type f -name "fusion" -exec cp {} /build/fusion-server \;
+RUN make nosandbox -j$(nproc)
 
 FROM debian:bookworm-slim
 
@@ -25,7 +20,7 @@ WORKDIR /home/container
 
 RUN mkdir -p /opt/openfusion
 
-COPY --from=builder /build/fusion-server /opt/openfusion/fusion
+COPY --from=builder /build/bin/fusion /opt/openfusion/fusion
 COPY --from=builder /build/config.ini /opt/openfusion/config.ini
 COPY --from=builder /build/tdata /opt/openfusion/tdata
 COPY --from=builder /build/sql /opt/openfusion/sql
